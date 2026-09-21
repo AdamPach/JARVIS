@@ -1,0 +1,20 @@
+# Raw, unsanitized n8n exports — staging area, never published
+workflows/raw/*
+!workflows/raw/.gitkeep
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+credentials*.json
+
+# Node (for scripts/)
+node_modules/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
