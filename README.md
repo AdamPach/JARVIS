@@ -10,7 +10,14 @@ the assistant itself runs on my n8n instance.
 | `workflows/` | Sanitized workflow exports. `raw/` is local-only.     |
 | `prompts/`   | System prompts from AI Agent nodes, as plain markdown |
 | `docs/`      | Architecture, per-workflow notes, reusable patterns   |
+| `specs/`     | Workflows that don't exist yet — drafts to build from |
 | `scripts/`   | Export and sanitization helpers                       |
+
+## Building something new
+
+Drafts for future workflows live in `specs/`. Copy `specs/TEMPLATE.md`,
+iterate until it's `Status: ready`, then hand the file over to be built.
+See `specs/README.md`.
 
 ## Backing up a workflow
 

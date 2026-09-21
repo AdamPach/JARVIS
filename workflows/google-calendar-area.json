@@ -1,0 +1,416 @@
+{
+  "name": "Google Calendar Area",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_message"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [-544, -192],
+      "id": "a8f93b03-ed6e-46e1-bdc3-5c38506f12ec",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.user_message }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Goal\n\nExtract structured details for one calendar event from the user message. Return the details and whether extraction succeeded.\n\n# Event Details\n\n## Title\n\n- Meaning: A short, specific title grounded in the message context.\n- Required: Yes.\n\n## Start Date Time\n\n- Meaning: When the event starts.\n- Required: Yes. A timed event needs a date and clock time; an all-day event needs a date.\n\n## End Date Time\n\n- Meaning: When the event ends or how long it lasts.\n- Required: No.\n- When not specified: Use a 1-hour duration for timed events or one calendar day for all-day events.\n\n## All Day\n\n- Meaning: The event occupies one or more whole calendar dates.\n- Required: No; default to false.\n- Set true when the user explicitly says the event is all-day, gives only a date for a naturally day-based event (such as a birthday or vacation), or gives a multi-day range or duration without clock times.\n- Keep false and preserve explicit clock times for timed multi-day events. A date-only meeting or appointment that normally needs a time is incomplete unless explicitly all-day.\n- When true, set the start to 00:00:00 on the first included date and the end to 00:00:00 on the day after the last included date. The end is exclusive.\n\n# Rules\n\n- Output date-times in YYYY-MM-DDTHH:mm:ss format, without a time-zone offset.\n- For resolving relative dates (next Friday, in two days, ...), use this as the current date and time: {{ $now.toISO() }}.\n- Do not invent missing details beyond the defaults above.\n- If explicit all-day wording conflicts with specific clock times, extraction fails as unclear.\n- Extraction fails if a required detail is missing or unclear, or if an optional detail is mentioned but cannot be fully extracted. An optional detail that is not mentioned does not cause failure.\n- Extraction also fails if the end is not after the start.\n- On failure, use the empty-string values below, not null.\n\n# Output\n\n- `title` — Extracted title, or \"\" when extraction fails.\n- `start_date_time` — Extracted start, or \"\" when extraction fails.\n- `end_date_time` — Extracted end, or \"\" when extraction fails.\n- `all_day` — true if the event is all-day; otherwise false.\n- `success` — true if extraction succeeded; otherwise false.\n- `reason` — Brief, concrete reason for failure; otherwise \"\".\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [-320, -192],
+      "id": "e62f9788-5e48-495f-9ded-e883d9b25723",
+      "name": "Event Info Extractor"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.6-luna",
+          "mode": "list",
+          "cachedResultName": "gpt-5.6-luna"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [-320, 48],
+      "id": "096f6d71-2341-4fef-ab3f-b3e88d918d8b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "REDACTED",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"title\": \"Dentist appointment\",\n  \"start_date_time\": \"2026-09-24T14:00:00\",\n  \"end_date_time\": \"2026-09-24T15:00:00\",\n  \"all_day\": false,\n  \"success\": true,\n  \"reason\": \"\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [-192, 48],
+      "id": "5788b508-019b-4546-b528-8cdb2ce59b3d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "name-present",
+              "leftValue": "={{ $json.output.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "2e853798-037d-4295-a8ae-ac63608e9664",
+      "name": "Has All Event Info?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [32, -192]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "131970d7-433e-4222-95e0-18c6153e4309",
+              "leftValue": "={{ $json.output.all_day }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [256, -288],
+      "id": "d914bdc5-dcd7-4c44-834c-cd6c3e805693",
+      "name": "Is All Day Event"
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "REDACTED@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "JARVIS"
+        },
+        "timeMin": "={{ $json.output.start_date_time.toDateTime() }}",
+        "timeMax": "={{ $json.output.end_date_time.toDateTime() }}",
+        "options": {}
+      },
+      "id": "9820c84c-a589-4436-a63c-afd8fd35e6fb",
+      "name": "Check Slot Availability",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [480, -208],
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REDACTED",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "slot-free",
+              "leftValue": "={{ $json.available }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b3d455b1-8d44-44d1-8feb-2f6adec53281",
+      "name": "Is Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [704, -208]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "REDACTED@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "JARVIS"
+        },
+        "start": "={{ $('Event Info Extractor').item.json.output.start_date_time.toDateTime() }}",
+        "end": "={{ $('Event Info Extractor').item.json.output.end_date_time.toDateTime() }}",
+        "additionalFields": {
+          "allday": "={{ $('Event Info Extractor').item.json.output.all_day }}",
+          "summary": "={{ $('Event Info Extractor').item.json.output.title }}"
+        }
+      },
+      "id": "e82c502f-af89-422c-8926-b94f56eed63b",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [928, -384],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REDACTED",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "created",
+              "type": "string"
+            },
+            {
+              "id": "output",
+              "name": "details",
+              "value": "=Added to your calendar: {{ $json.summary }}\nFrom {{ $json.start.dateTime }} to {{ $json.end.dateTime }}\n{{ $json.htmlLink }}",
+              "type": "string"
+            },
+            {
+              "id": "c34e0731-271e-4339-a35d-a73562def877",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb27ebf8-be76-4b9d-9f26-e070563231f7",
+      "name": "Confirm Event Created",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1152, -384]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "slot_busy",
+              "type": "string"
+            },
+            {
+              "id": "output",
+              "name": "details",
+              "value": "=The requested time slot, {{ $('Event Info Extractor').item.json.output.start_date_time }} - {{ $('Event Info Extractor').item.json.output.end_date_time }} (Europe/Prague), is unavailable because it overlaps with an existing calendar event. No new event was created.",
+              "type": "string"
+            },
+            {
+              "id": "2206178c-7a4b-47c6-b7e8-ca22b2416d9c",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "47dfbe3c-aaa8-45ce-b807-966edce75ed8",
+      "name": "Report Slot Busy",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1152, -160]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "missing_info",
+              "type": "string"
+            },
+            {
+              "id": "output",
+              "name": "details",
+              "value": "={{ $json.output.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "03963cad-a7a5-4d96-85c2-a11252035840",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c89a2dd3-ae41-467e-abde-df708a8ece4a",
+      "name": "Report Missing Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1152, 32]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d69686c4-88dc-4f19-b5b3-23bc9b2124ad",
+              "name": "area_name",
+              "value": "calendar_area",
+              "type": "string"
+            },
+            {
+              "id": "d42b66ee-a208-4d1e-b8f6-3212ff0965ae",
+              "name": "area_description",
+              "value": "Calendar scheduling and event management, including availability, appointments, and event changes.",
+              "type": "string"
+            },
+            {
+              "id": "0c192d1a-84c3-4fb9-b2f5-06527615d9f4",
+              "name": "success",
+              "value": "={{ $json.success }}",
+              "type": "string"
+            },
+            {
+              "id": "a29eb004-e20c-4997-85a5-dff9020f159a",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "fb40a4d6-f0b9-4259-a41d-b564575641f0",
+              "name": "details",
+              "value": "={{ $json.details }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1376, -160],
+      "id": "c766a62c-d15d-4f45-a800-6c93f6963ef4",
+      "name": "Area Standart Output"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [[{ "node": "Event Info Extractor", "type": "main", "index": 0 }]]
+    },
+    "Event Info Extractor": {
+      "main": [[{ "node": "Has All Event Info?", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "Event Info Extractor", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [[{ "node": "Event Info Extractor", "type": "ai_outputParser", "index": 0 }]]
+    },
+    "Has All Event Info?": {
+      "main": [
+        [{ "node": "Is All Day Event", "type": "main", "index": 0 }],
+        [{ "node": "Report Missing Info", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is All Day Event": {
+      "main": [
+        [{ "node": "Create Calendar Event", "type": "main", "index": 0 }],
+        [{ "node": "Check Slot Availability", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Slot Availability": {
+      "main": [[{ "node": "Is Slot Free?", "type": "main", "index": 0 }]]
+    },
+    "Is Slot Free?": {
+      "main": [
+        [{ "node": "Create Calendar Event", "type": "main", "index": 0 }],
+        [{ "node": "Report Slot Busy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [[{ "node": "Confirm Event Created", "type": "main", "index": 0 }]]
+    },
+    "Confirm Event Created": {
+      "main": [[{ "node": "Area Standart Output", "type": "main", "index": 0 }]]
+    },
+    "Report Slot Busy": {
+      "main": [[{ "node": "Area Standart Output", "type": "main", "index": 0 }]]
+    },
+    "Report Missing Info": {
+      "main": [[{ "node": "Area Standart Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "pinData": {},
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
