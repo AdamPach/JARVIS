@@ -5,6 +5,7 @@ workflows/raw/*
 # Secrets
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 credentials*.json

@@ -12,6 +12,7 @@ the assistant itself runs on my n8n instance.
 | `docs/`      | Architecture, per-workflow notes, reusable patterns   |
 | `specs/`     | Workflows that don't exist yet — drafts to build from |
 | `scripts/`   | Export and sanitization helpers                       |
+| `deploy/`    | Docker Compose stack for the n8n server (n8n, Postgres, Caddy) |
 
 ## Building something new
 
