@@ -45,14 +45,16 @@ areas follow the pattern and add their own section at the end.
 These turn on area memory system-wide. Do them together with the first area
 that gets a table.
 
-### Contract input gains `conversation_id`
+### Contract input gains `conversation_id` and `reference_id`
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `user_message` | string | *(unchanged)* Raw text, or the combined request for a follow-up. |
+| `relation` | string | *(from conversation memory)* `new` \| `follow_up` \| `reference`. |
 | `conversation_id` | number | **New.** `id` of the current `jarvis_conversation` row. The area files its details under it. |
+| `reference_id` | number | **New.** For `relation = reference`: the `id` of the exchange the message refers to (the conversation row's `parent_id`). Empty otherwise. |
 
-Areas without a table simply ignore it. The contract **output** does not
+Areas without a table simply ignore both. The contract **output** does not
 change: still the seven fields from conversation memory.
 
 ### Gateway
@@ -62,6 +64,7 @@ then map
 
 ```
 conversation_id = {{ $('Log Received').item.json.id }}
+reference_id    = {{ $('Log Dispatch').item.json.relation === 'reference' ? $('Log Dispatch').item.json.parent_id : '' }}
 ```
 
 `Describe Fallback` needs nothing; it isn't a sub-workflow.
@@ -75,10 +78,11 @@ same condition: `createdAt` *less than*
 
 ### Docs
 
-- `docs/patterns/adding-an-area.md`: input is `user_message` +
-  `conversation_id`; areas that create things own a table (link here).
-- `specs/TEMPLATE.md`: add `conversation_id` to **Input**, and the
-  **Area table** section below.
+- `docs/patterns/adding-an-area.md`: input is `user_message`, `relation`,
+  `conversation_id`, `reference_id`; areas that create things own a table
+  (link here).
+- `specs/TEMPLATE.md`: add `conversation_id` and `reference_id` to **Input**,
+  and the **Area table** section below.
 
 ---
 
@@ -94,8 +98,9 @@ same condition: `createdAt` *less than*
    *"renamed **Meeting with Tom** (Mon 15:00)"* without calling the service
    again: usually a title and a time.
 4. **Is there a link worth keeping?** Cheap to store, useful in replies.
-5. **What happens when it changes later?** Append a new row per change, or
-   update the existing one? (See open questions.)
+5. **What happens when it changes later?** Recommended: every run that
+   creates *or changes* the thing appends a row under its own
+   `conversation_id` (see [References](#references-rename-it-move-it-to-4pm)).
 
 ### Rules for columns
 
@@ -144,15 +149,29 @@ are designed for.
 
 ### References ("rename it", "move it to 4pm")
 
-1. **Gateway** resolves "it" to a conversation row: the latest exchange, or
-   the one you replied to via Telegram. That's conversation memory's job.
-2. **Gateway** passes that row's id to the area as an extra input, e.g.
-   `reference_id`.
-3. **Area** looks up its own table where `conversation_id` = `reference_id`,
-   gets the external ID, and acts on it (update/delete in the service).
+Conversation memory (step 1) already does the first half: it picks the
+candidate exchange (swipe-reply, or newest within 30 min), decides
+`relation = reference`, and sends the message to the candidate's area. Until
+area memory exists, the area's `Is Reference?` guard answers "not supported
+yet". With area memory:
 
-The Gateway never learns what an event is; the area never learns how "it" was
-resolved.
+1. **Gateway** passes `reference_id` = the candidate's conversation row id.
+2. **Area** looks up its own table where `conversation_id` = `reference_id`
+   and gets the external ID.
+3. **Area** acts on it (update/delete in the service) — this replaces the
+   `Is Reference?` guard with a real branch, which is a new area capability
+   and gets its own spec.
+4. **Area** appends a row for the change under the **current**
+   `conversation_id`, with the same external ID and the new values.
+
+Step 4 is what makes chains work without anyone walking the conversation
+table: "rename it" (row 44) then "and move it to 4pm" refers to row 44, and
+row 44 has its own area row pointing at the same event. Areas never read
+`jarvis_conversation`; the Gateway never reads area tables.
+
+If no area row matches `reference_id` (the referenced run created nothing,
+e.g. it failed), the area returns a clear outcome such as
+`reference_not_found`: *"There's nothing from that message I could change."*
 
 ### Structured partial state (only if needed)
 
@@ -241,13 +260,13 @@ event.
 
 ## Open questions
 
-- **Changes to existing things:** when a later rename/move/delete changes an
-  event, append a new row (history) or update the existing one (current state
-  only)? Update is simpler to look up; append keeps a trail.
-- **Reference to a row without an area row:** "rename it" points at a
-  conversation row whose run didn't create anything (e.g. `missing_info`).
-  Should the area walk back via `parent_id` to the nearest row that did, or
-  just report "nothing to rename"?
+- **Append vs. update on changes:** the reference design above appends a row
+  per change (step 4), which keeps a trail and makes chains work. Confirm when
+  the first update capability is specced; updating in place would need the
+  area to walk the chain instead.
 - **Longer retention for areas?** Renaming an event two weeks later would need
   area rows older than 7 days, but the conversation row they point to would be
   gone. Keep both at 7 days for now; revisit with references.
+- **Cross-area references** ("add it to my todo list" after an event was
+  created): conversation memory sends a reference to the candidate's area
+  only. Revisit when a second area that creates things exists.
